@@ -4,8 +4,7 @@
 
 void memdump(char *fmt, char *data);
 
-int
-main(int argc, char *argv[])
+int main(int argc, char *argv[])
 {
   if(argc == 1){
     printf("Example 1:\n");
@@ -57,9 +56,48 @@ main(int argc, char *argv[])
   exit(0);
 }
 
-void
-memdump(char *fmt, char *data)
+void memdump(char *fmt, char *data)
 {
-  // Your code here.
+  char *dptr = data;  // Pointer to navigate through the data
 
+  for (int i = 0; fmt[i] != '\0'; i++) {
+    switch (fmt[i]) {
+      case 'i': {  // 4-byte integer (32-bit)
+        int val = *(int*)dptr;
+        printf("%d\n", val);
+        dptr += 4;  // Move pointer by 4 bytes
+        break;
+      }
+      case 'p': {  // 8-byte pointer (64-bit, print as hex)
+        uint64 val = *(uint64*)dptr;
+        printf("%lx\n", val);
+        dptr += 8;  // Move pointer by 8 bytes
+        break;
+      }
+      case 'h': {  // 2-byte short integer (16-bit)
+        short val = *(short*)dptr;
+        printf("%d\n", val);
+        dptr += 2;  // Move pointer by 2 bytes
+        break;
+      }
+      case 'c': {  // 1-byte ASCII character
+        char val = *dptr;
+        printf("%c\n", val);
+        dptr += 1;  // Move pointer by 1 byte
+        break;
+      }
+      case 's': {  // 8 bytes to a pointer to a string (64-bit)
+        char *s_ptr = *(char**)dptr;  // Dereference to get the string
+        printf("%s\n", s_ptr);
+        dptr += 8;  // Move pointer by 8 bytes (pointer size)
+        break;
+      }
+      case 'S': {  // Null-terminated string (from current position)
+        printf("%s\n", dptr);
+        break;  // Don't increment the pointer, since we're printing the whole string
+      }
+      default:
+        break;  // Ignore invalid format specifiers
+    }
+  }
 }
