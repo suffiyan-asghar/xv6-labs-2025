@@ -197,6 +197,7 @@ UPROGS=\
 	$U/_dorphan\
 	$U/_find\
 	$U/_sixfive\
+	$U/_uptime\
 
 
 
