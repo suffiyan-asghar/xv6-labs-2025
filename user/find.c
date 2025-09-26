@@ -4,6 +4,46 @@
 #include "kernel/fs.h"
 #include "kernel/param.h"
 
+
+int match(char*, char*);
+int matchhere(char*, char*);
+int matchstar(int, char*, char*);
+
+int
+match(char *re, char *text)
+{
+  if(re[0] == '^')
+    return matchhere(re+1, text);
+  do{  // must look at empty string
+    if(matchhere(re, text))
+      return 1;
+  }while(*text++ != '\0');
+  return 0;
+}
+
+int matchhere(char *re, char *text)
+{
+  if(re[0] == '\0')
+    return 1;
+  if(re[1] == '*')
+    return matchstar(re[0], re+2, text);
+  if(re[0] == '$' && re[1] == '\0')
+    return *text == '\0';
+  if(*text!='\0' && (re[0]=='.' || re[0]==*text))
+    return matchhere(re+1, text+1);
+  return 0;
+}
+
+int matchstar(int c, char *re, char *text)
+{
+  do{  // a * matches zero or more instances
+    if(matchhere(re, text))
+      return 1;
+  }while(*text!='\0' && (*text++==c || c=='.'));
+  return 0;
+}
+// End of regexp matcher
+
 void find(char *path, const char *target, int exec_flag, char *argv_exec[]) {
     char buf[512], *p;
     int fd;
@@ -29,7 +69,7 @@ void find(char *path, const char *target, int exec_flag, char *argv_exec[]) {
                     filename = q + 1;
                 }
             }
-            if (strcmp(filename, target) == 0) {
+            if (match((char *)target, (char *)filename)) {
                 if (exec_flag) {
                     if (fork() == 0) {
                         char *argv[MAXARG];
@@ -86,7 +126,6 @@ int main(int argc, char *argv[]) {
         exit(1);
     }
 
-    
     if (argc > 3 && strcmp(argv[3], "-exec") == 0) {
         exec_flag = 1;
         if (argc < 5) {
