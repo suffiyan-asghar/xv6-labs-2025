@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+// NOTE: Do NOT include <string.h>; xv6 provides its own string routines via defs.h.
 
 struct cpu cpus[NCPU];
 
@@ -52,9 +53,9 @@ procinit(void)
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
   for(p = proc; p < &proc[NPROC]; p++) {
-      initlock(&p->lock, "proc");
-      p->state = UNUSED;
-      p->kstack = KSTACK((int) (p - proc));
+    initlock(&p->lock, "proc");
+    p->state = UNUSED;
+    p->kstack = KSTACK((int) (p - proc));
   }
 }
 
@@ -273,8 +274,11 @@ kfork(void)
   }
   np->sz = p->sz;
 
-  // >>> Copy interpose mask from parent to child (ADDED LINE) <<<
+  // Copy interpose mask from parent to child.
   np->interpose_mask = p->interpose_mask;
+
+  // Copy the allowed path to the child safely (xv6 strncpy).
+  strncpy(np->allowed_path, p->allowed_path, sizeof(np->allowed_path));
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);

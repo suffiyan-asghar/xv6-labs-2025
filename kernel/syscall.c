@@ -7,6 +7,7 @@
 #include "syscall.h"
 #include "defs.h"
 
+
 // Fetch the uint64 at addr from the current process.
 int
 fetchaddr(uint64 addr, uint64 *ip)
@@ -49,14 +50,14 @@ argraw(int n)
     return p->trapframe->a5;
   }
   panic("argraw");
-  return -1;
+  return (uint64)-1;
 }
 
 // Fetch the nth 32-bit system call argument.
 void
 argint(int n, int *ip)
 {
-  *ip = argraw(n);
+  *ip = (int)argraw(n);
 }
 
 // Retrieve an argument as a pointer.
@@ -134,18 +135,36 @@ void
 syscall(void)
 {
   struct proc *p = myproc();
-  int num = p->trapframe->a7; // System call number
+  int num = p->trapframe->a7;  // System call number
+  char path_buf[512];
+  int rejected = 0;
 
-  // 1. CHECK FOR RESTRICTION
-  // If the bit for this syscall 'num' is set in p->interpose_mask, deny it.
+  // 1) Restriction check via interpose mask
   if (p->interpose_mask & (1 << num)) {
+    rejected = 1;  // masked by default
+
+    // Path-exception logic for open/exec
+    if (num == SYS_open || num == SYS_exec) {
+      // pathname is the 0th argument for both open and exec in this setup
+      if (argstr(0, path_buf, sizeof(path_buf)) >= 0) {
+        // allow if (a) path matches allowed_path AND (b) allowed_path is not "-"
+        if (strncmp(path_buf, p->allowed_path, sizeof(path_buf)) == 0 &&
+            strncmp(p->allowed_path, "-", 2) != 0) {
+          rejected = 0; // allow this syscall
+        }
+      }
+      // if argstr failed or path didn't match, rejected stays 1
+    }
+  }
+
+  // 2) If rejected, set return value to -1 and return
+  if (rejected) {
     p->trapframe->a0 = -1;
     return;
   }
 
-  // 2. Original execution logic
-  if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    // Call the system call function and store its return value.
+  // 3) Normal syscall dispatch
+  if (num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     p->trapframe->a0 = syscalls[num]();
   } else {
     printf("%d %s: unknown sys call %d\n", p->pid, p->name, num);

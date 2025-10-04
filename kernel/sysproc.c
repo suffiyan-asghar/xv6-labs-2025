@@ -7,6 +7,7 @@
 #include "proc.h"
 #include "vm.h"
 
+
 uint64
 sys_exit(void)
 {
@@ -111,21 +112,22 @@ uint64
 sys_interpose(void)
 {
   int mask;
-  char buf[512]; // buffer for the path string (unused, but must be retrieved)
+  char buf[512]; // buffer for the path string
 
-  // 1. Retrieve the integer mask (first argument, arg 0)
-  // argint is void; no error code to check.
+  // 1) Retrieve the integer mask
   argint(0, &mask);
-  
-  // 2. Retrieve the string path (second argument, arg 1)
-  // argstr requires a destination buffer and max length.
+
+  // 2) Retrieve the string path into buf
   if (argstr(1, buf, sizeof(buf)) < 0)
     return -1;
 
-  // 3. Store the mask in the current process struct
+  // 3) Store in current process
   struct proc *p = myproc();
   p->interpose_mask = (uint)mask;
 
-  // 'buf' (path) is intentionally ignored in this assignment.
+  // 4) Save allowed path safely
+  strncpy(p->allowed_path, buf, sizeof(p->allowed_path) - 1);
+  p->allowed_path[sizeof(p->allowed_path) - 1] = '\0';
+
   return 0;
 }
