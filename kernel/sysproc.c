@@ -53,7 +53,7 @@ sys_sbrk(void)
     }
   } else {
     // Lazily allocate memory for this process: increase its memory
-    // size but don't allocate memory. If the processes uses the
+    // size but don't allocate memory. If the process uses the
     // memory, vmfault() will allocate it.
     if(addr + n < addr)
       return -1;
@@ -104,4 +104,28 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+// interpose(mask, path)
+uint64
+sys_interpose(void)
+{
+  int mask;
+  char buf[512]; // buffer for the path string (unused, but must be retrieved)
+
+  // 1. Retrieve the integer mask (first argument, arg 0)
+  // argint is void; no error code to check.
+  argint(0, &mask);
+  
+  // 2. Retrieve the string path (second argument, arg 1)
+  // argstr requires a destination buffer and max length.
+  if (argstr(1, buf, sizeof(buf)) < 0)
+    return -1;
+
+  // 3. Store the mask in the current process struct
+  struct proc *p = myproc();
+  p->interpose_mask = (uint)mask;
+
+  // 'buf' (path) is intentionally ignored in this assignment.
+  return 0;
 }

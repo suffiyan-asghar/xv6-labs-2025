@@ -1,0 +1,10 @@
+Ans1) usertrap
+Ans2) $2 = 0xf
+Ans3) (gdb) p /x $sstatus
+$3 = 0x200000022
+Supervisor mode
+Ans4)assembly instr: lw a0,0(zero)
+register corresponding to the variable num is a0
+ans5)due to load page fault
+ans6) pid = 1
+process name = init.

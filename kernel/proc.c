@@ -273,6 +273,9 @@ kfork(void)
   }
   np->sz = p->sz;
 
+  // >>> Copy interpose mask from parent to child (ADDED LINE) <<<
+  np->interpose_mask = p->interpose_mask;
+
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
 
