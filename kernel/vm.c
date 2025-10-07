@@ -141,13 +141,38 @@ walkaddr(pagetable_t pagetable, uint64 va)
 }
 
 
-#if defined(LAB_PGTBL) || defined(SOL_MMAP) || defined(SOL_COW)
-void
-vmprint(pagetable_t pagetable) {
-  // your code here
-}
-#endif
+#if defined(LAB_PGTBL)
 
+static void
+print_pte(pagetable_t pagetable, int level, uint64 va_base)
+{
+  for (int i = 0; i < 512; i++) {
+    pte_t pte = pagetable[i];
+    if (pte & PTE_V) {
+      uint64 pa = PTE2PA(pte);
+      uint64 va = va_base | ((uint64)i << (9 * level + 12));
+
+      for (int j = 0; j <= level; j++)
+        printf(" ..");
+
+      printf("%p: pte %p pa %p\n",
+             (void*)va, (void*)(uint64)pte, (void*)pa);
+
+      // Recurse only if this entry points to a lower-level table
+      if ((pte & (PTE_R | PTE_W | PTE_X)) == 0)
+        print_pte((pagetable_t)pa, level + 1, va);
+    }
+  }
+}
+
+void
+vmprint(pagetable_t pagetable)
+{
+  printf("page table %p\n", (void*)pagetable);
+  print_pte(pagetable, 0, 0);
+}
+
+#endif
 
 
 // add a mapping to the kernel page table.
