@@ -1,0 +1,79 @@
+qs1)
+
+User Text Segment (Executable Code)
+- va 0x0: User program entry point with read/execute permissions (0x5B)
+- va 0x1000: Continuation of executable code with same permissions
+- Permissions: 0x5B (Valid | Read | Execute | User) - protects code from modification
+
+User Data Segment
+- va 0x2000: Initialized data area with read/write permissions (0x17)
+- Permissions: 0x17 (Valid | Read | Write | User) - allows data manipulation but prevents code execution
+
+Kernel Memory in User Space
+- va 0x3000: Kernel data temporarily mapped at low address (0x07)
+- Permissions: 0x07 (Valid | Read | Write) - supervisor-only access for kernel operations
+
+Dynamic User Memory
+- va 0x4000: Stack/heap region with accessed/dirty flags set (0xD7)
+- Permissions: 0xD7 (Valid | Read | Write | User | Accessed | Dirty) - indicates active read/write usage
+
+Unmapped Regions
+- va 0x5000-0x9000: Unused address space
+- va 0x3FFFFF6000-0x3FFFFFD000: Large gap between user low/high memory
+
+System Pages at High Memory
+- va 0x3FFFFFE000: Trapframe page for saving process state (0xC7)
+- Permissions: 0xC7 (Valid | Read | Write | Accessed | Dirty) - kernel-only access to protect trap context
+
+- va 0x3FFFFFF000: Trampoline page for privilege transitions (0x4B)
+- Permissions: 0x4B (Valid | Read | Execute | Accessed) - enables safe user/kernel mode switching
+
+The subsequent ugetpid_test failure with scause 0xd (store page fault) at va 0x3fffffd000 suggests an attempt to write to unmapped memory, consistent with the gap shown in the page table.
+
+
+qs2) Several system calls that only retrieve data about the current process without modifying its state can be optimized using a shared read-only USYSCALL page, since they don't require privileged operations.
+
+For example:
+- uptime(): The kernel could periodically update a field such as usyscall->ticks, allowing user processes to read it directly instead of making a system call.
+
+- getppid(): The parent process ID (usyscall->ppid) could be stored in the same shared page during process creation or forking.
+
+- time(): The current time could similarly be shared through this page to eliminate the need for a system call.
+
+- getuid() or getgid(): These static user and group identifiers could be stored in the shared page as they represent fixed information about the process.
+
+
+qs3)Low Virtual Addresses (User Text, Data, and Heap)
+This region starts at virtual address 0x0 and contains the core program components loaded by the exec system call. The permissions provide memory protection for the user process.
+
+VA 0x0000000000000000 and VA 0x0000000000001000
+    PTE Flags: Read (R), Execute (X), User (U), Valid (V). (R-XU).
+    Logical Content: Text (Code Segment). These pages hold the program's executable instructions.
+    Permission: The Write (W) bit is deliberately not set. This prevents the user program from accidentally modifying its own code, such as through a null pointer dereference to address 0, which would cause a page-fault exception.
+
+VA 0x0000000000002000 and VA 0x0000000000004000
+    PTE Flags: Read (R), Write (W), User (U), Valid (V). (R-WU).
+    Logical Content: Data / Initial Heap. These pages contain variables and dynamic memory accessible via sbrk.
+    Permission: The Execute (X) bit is deliberately not set. This protects the process from attempting to execute data as code, which is a common security hardening technique.
+
+VA 0x0000000000003000
+    PTE Flags: Read (R), Write (W), Valid (V), but User (U) is not set. (R-W, Supervisor Only).
+    Logical Content: Kernel-accessible data (Anomalous). Since the User bit (PTE_U) is cleared, this page is only accessible when the CPU is running in Supervisor mode (the kernel). While uncommon for a standard user data segment, this suggests a segment that the kernel maps into the user address space but strictly prohibits user access to.
+
+High Virtual Addresses (Kernel Interface Pages)
+This region uses the highest possible virtual addresses in the 39-bit address space, reserved by xv6 for pages necessary for kernel interaction and trap handling. Note that the PTE_U flag is often cleared here to enforce user/kernel isolation.
+
+VA 0x0000003fffffd000
+    PTE Flags: Read (R), Write (W), Valid (V), but User (U) is not set. (R-W, Supervisor Only).
+    Logical Content: Trapframe Page. This page holds the struct trapframe, a kernel structure used to save the user process's state (registers, etc.) during traps and system calls.
+    Permission: The PTE_U bit is cleared to ensure the user program cannot read or modify its own saved state, which is critical for system security and integrity.
+
+VA 0x0000003fffffe000
+    PTE Flags: Read (R), Write (W), User (U), Valid (V). (R-WU).
+    Logical Content: User Stack Page. This is the page currently used by the process's stack.
+    Permission: It requires R, W, and U permissions for the process to function normally (stack operations). Directly below this address range, xv6 places an inaccessible guard page (not printed here, as it's invalid) to detect stack overflow.
+
+VA 0x0000003ffffff000
+    PTE Flags: Read (R), Execute (X), Valid (V), but User (U) is not set. (R-X, Supervisor Only).
+    Logical Content: Trampoline Page. This page contains the shared kernel entry/exit code (uservec/userret) used to transfer control between user and supervisor modes during traps and system calls.
+    Permission: The PTE_U bit is cleared because this code must only be executed by the kernel (Supervisor Mode). It is mapped at the top of the user address space to minimize overlap with user memory.
