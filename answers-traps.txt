@@ -1,0 +1,20 @@
+qs1) Which registers contain arguments to functions? For example, which register holds 13 in main's call to printf?
+ans1) In RISC-V, function arguments are passed in registers a0-a7. In main's call to printf, register a2 holds the value 13
+
+qs2) Where is the call to function f in the assembly code for main? Where is the call to g? (Hint: the compiler may inline functions.)
+ans2)There are no calls to f or g in main's assembly. The compiler inlined both functions. At line 26, we see li a1,12 which is the result of computing f(8)+1 = (8+3)+1 = 12 directly at compile time.
+
+qs3) At what address is the function printf located?
+ans3)printf is located at address 0x6f6
+
+qs4) What value is in the register ra just after the jalr to printf in main?
+ans4) The instruction at address 0x30 is jal 6f6 <printf>. The jal instruction saves the return address (PC+4) in ra, so ra contains 0x34 (the address of the next instruction after the jal).
+
+qs5) run commands
+ans5)The first printf call outputs "He110 World". This is determined by the data values: 57616 in hexadecimal is 0xE110, and the little-endian value 0x00646c72 corresponds to the byte sequence 0x72, 0x6c, 0x64, 0x00, which forms the string "rld\0". Combined, this produces the output "He110 World".
+
+If the system were big-endian, to print "World" the data in memory would need to be 0x726c6400. The value 57616 (0xE110) would remain the same because it is passed by value, not by reference.
+
+qs6) output after y=?
+ans6) The value printed after 'y=' will be whatever uninitialized data is in the a2 register at the time of the printf call. Since printf expects two format specifiers but only one argument is provided, the second value is taken from an undefined location, resulting in garbage output.
+
