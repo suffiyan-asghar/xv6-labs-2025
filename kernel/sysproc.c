@@ -105,3 +105,28 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// project work
+
+uint64
+sys_getprocinfo(void)
+{
+  int pid;
+  uint64 uaddr;
+  struct procinfo pi;
+
+  // These DO NOT return int in your version — so no checking!
+  argint(0, &pid);
+  argaddr(1, &uaddr);
+
+  // Use your kernel helper
+  if(getprocinfo(pid, &pi) < 0)
+    return -1;
+
+  // Copy result back to user space
+  if(copyout(myproc()->pagetable, uaddr, (char *)&pi, sizeof(pi)) < 0)
+    return -1;
+
+  return 0;
+}
+

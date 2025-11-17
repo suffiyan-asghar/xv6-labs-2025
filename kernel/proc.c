@@ -685,3 +685,25 @@ procdump(void)
     printf("\n");
   }
 }
+
+// project work
+int
+getprocinfo(int pid, struct procinfo *pi)
+{
+  struct proc *p;
+  int found = -1;
+
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    if(p->pid == pid){
+      pi->pid = p->pid;
+      pi->state = p->state;
+      found = 0;
+      release(&p->lock);
+      break;
+    }
+    release(&p->lock);
+  }
+  return found;
+}
+
