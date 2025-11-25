@@ -124,6 +124,11 @@ allocproc(void)
 found:
   p->pid = allocpid();
   p->state = USED;
+  //week2
+  p->qlev = 0;
+  p->qticks = 0;
+  p->time_slice = mlfq_quantum[0];
+  p->last_run = 0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -411,6 +416,38 @@ kwait(uint64 addr)
   }
 }
 
+// find the highest-priority runnable process 
+//week2
+static struct proc* mlfq_pick(void) {
+    struct proc *p, *best = 0;
+    int best_level = NQUEUE;
+
+    for(p = proc; p < &proc[NPROC]; p++){
+        acquire(&p->lock);
+        if(p->state == RUNNABLE){
+            if(p->qlev < best_level){
+                if(best) release(&best->lock);
+                best = p;
+                best_level = p->qlev;
+            } else if(p->qlev == best_level) {
+                if(!best || p->last_run < best->last_run){
+                    if(best) release(&best->lock);
+                    best = p;
+                } else {
+                    release(&p->lock);
+                }
+            } else {
+                release(&p->lock);
+            }
+        } else {
+            release(&p->lock);
+        }
+    }
+
+    return best;  // still locked
+}
+
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -435,22 +472,22 @@ scheduler(void)
     intr_off();
 
     int found = 0;
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
+    //week2
+    p = mlfq_pick();
+    if(p){
         p->state = RUNNING;
+
+        if(p->time_slice <= 0)
+            p->time_slice = mlfq_quantum[p->qlev];
+
+        p->last_run = ticks;
+
         c->proc = p;
         swtch(&c->context, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
         c->proc = 0;
+
+        release(&p->lock);
         found = 1;
-      }
-      release(&p->lock);
     }
     if(found == 0) {
       // nothing to run; stop running on this core until an interrupt.

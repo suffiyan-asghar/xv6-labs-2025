@@ -104,6 +104,15 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+
+  // ---------- MLFQ fields ----------//week2
+  #define NQUEUE 4
+
+  int qlev;              // current queue level (0 = highest)
+  int qticks;            // ticks consumed at this level
+  int time_slice;        // remaining quantum for current run
+  uint last_run;         // for RR ordering inside the same level
+  // --------------------------------
 };
 
 
@@ -116,3 +125,5 @@ struct procinfo {
 
 int getprocinfo(int pid, struct procinfo *pi);
 
+static const int mlfq_quantum[NQUEUE] = {1, 2, 4, 8};//weeek2
+static const int mlfq_allot[NQUEUE]   = {1, 2, 4, 8};//week2

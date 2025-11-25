@@ -199,6 +199,8 @@ UPROGS=\
 	$U/_sixfive\
 	$U/_uptime\
 	$U/_testprocinfo\
+	$U/_cpubound\
+	$U/_iobound\
 
 
 
@@ -306,7 +308,7 @@ QEMUGDB = $(shell if $(QEMU) -help | grep -q '^-gdb'; \
 	then echo "-gdb tcp::$(GDBPORT)"; \
 	else echo "-s -p $(GDBPORT)"; fi)
 ifndef CPUS
-CPUS := 3
+CPUS := 1
 endif
 ifeq ($(LAB),fs)
 CPUS := 1

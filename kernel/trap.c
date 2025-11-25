@@ -81,8 +81,29 @@ usertrap(void)
     kexit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
-    yield();
+  //week2
+  if(which_dev == 2){
+    struct proc *p = myproc();
+
+    if(p && p->state == RUNNING){
+        p->time_slice--;
+        p->qticks++;
+
+        // Level allotment consumed → demote
+        if(p->qticks >= mlfq_allot[p->qlev]){
+            if(p->qlev < NQUEUE-1)
+                p->qlev++;
+            p->qticks = 0;
+            p->time_slice = mlfq_quantum[p->qlev];
+        }
+        // Per-run quantum over → preempt
+        else if(p->time_slice <= 0){
+            p->time_slice = mlfq_quantum[p->qlev];
+            yield();
+        }
+    }
+  }
+
 
   prepare_return();
 
@@ -152,8 +173,23 @@ kerneltrap()
   }
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2 && myproc() != 0)
+  //week2
+  if(which_dev == 2 && myproc() != 0){
+    struct proc *p = myproc();
+    p->time_slice--;
+    p->qticks++;
+
+    if(p->qticks >= mlfq_allot[p->qlev]){
+        if(p->qlev < NQUEUE-1)
+            p->qlev++;
+        p->qticks = 0;
+        p->time_slice = mlfq_quantum[p->qlev];
+    }
+    else if(p->time_slice <= 0){
+        p->time_slice = mlfq_quantum[p->qlev];
+    }
     yield();
+  }
 
   // the yield() may have caused some traps to occur,
   // so restore trap registers for use by kernelvec.S's sepc instruction.
