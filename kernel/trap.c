@@ -88,6 +88,7 @@ usertrap(void)
     if(p && p->state == RUNNING){
         p->time_slice--;
         p->qticks++;
+	p->ticks++;
 
         // Level allotment consumed → demote
         if(p->qticks >= mlfq_allot[p->qlev]){
@@ -178,6 +179,7 @@ kerneltrap()
     struct proc *p = myproc();
     p->time_slice--;
     p->qticks++;
+    p->ticks++;
 
     if(p->qticks >= mlfq_allot[p->qlev]){
         if(p->qlev < NQUEUE-1)

@@ -129,6 +129,7 @@ found:
   p->qticks = 0;
   p->time_slice = mlfq_quantum[0];
   p->last_run = 0;
+  p->ticks = 0;  
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -732,11 +733,10 @@ getprocinfo(int pid, struct procinfo *pi)
   for(p = proc; p < &proc[NPROC]; p++){
     acquire(&p->lock);
     if(p->pid == pid){
-
       pi->pid = p->pid;
       pi->state = p->state;
-      pi->ticks = p->ticks;               // NEW
-      pi->queue_level = p->curr_queue;    // NEW
+      pi->ticks = p->ticks;
+      pi->queue_level = p->qlev;    // Changed from p->curr_queue to p->qlev
 
       release(&p->lock);
       return 0;
@@ -746,5 +746,4 @@ getprocinfo(int pid, struct procinfo *pi)
 
   return -1;
 }
-
 
