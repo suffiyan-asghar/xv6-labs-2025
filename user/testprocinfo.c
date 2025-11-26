@@ -8,14 +8,10 @@ main(void)
   struct procinfo pi;
 
   int pid = getpid();
+  getprocinfo(pid, &pi);
 
-  if(getprocinfo(pid, &pi) < 0){
-    printf("getprocinfo failed\n");
-    exit(1);
-  }
-
-  printf("Process Info:\n");
-  printf("pid=%d state=%d\n", pi.pid, pi.state);
+  printf("PID=%d\nState=%d\nTicks=%d\nQueue Level=%d\n",
+         pi.pid, pi.state, pi.ticks, pi.queue_level);
 
   exit(0);
 }

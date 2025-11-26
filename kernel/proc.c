@@ -728,19 +728,23 @@ int
 getprocinfo(int pid, struct procinfo *pi)
 {
   struct proc *p;
-  int found = -1;
 
   for(p = proc; p < &proc[NPROC]; p++){
     acquire(&p->lock);
     if(p->pid == pid){
+
       pi->pid = p->pid;
       pi->state = p->state;
-      found = 0;
+      pi->ticks = p->ticks;               // NEW
+      pi->queue_level = p->curr_queue;    // NEW
+
       release(&p->lock);
-      break;
+      return 0;
     }
     release(&p->lock);
   }
-  return found;
+
+  return -1;
 }
+
 

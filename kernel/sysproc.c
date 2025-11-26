@@ -115,8 +115,7 @@ sys_getprocinfo(void)
   uint64 uaddr;
   struct procinfo pi;
 
-  // These DO NOT return int in your version — so no checking!
-  argint(0, &pid);
+   argint(0, &pid);
   argaddr(1, &uaddr);
 
   // Use your kernel helper

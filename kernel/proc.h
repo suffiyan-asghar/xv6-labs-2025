@@ -91,7 +91,8 @@ struct proc {
   int killed;                  // If non-zero, have been killed
   int xstate;                  // Exit status to be returned to parent's wait
   int pid;                     // Process ID
-
+  int ticks;         // update this in scheduler later
+  int curr_queue;
   // wait_lock must be held when using this:
   struct proc *parent;         // Parent process
 
@@ -121,6 +122,8 @@ struct proc {
 struct procinfo {
   int pid;
   int state;
+  int ticks;        
+  int queue_level; 
 };
 
 int getprocinfo(int pid, struct procinfo *pi);

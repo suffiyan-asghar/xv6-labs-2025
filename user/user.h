@@ -53,6 +53,8 @@ void free(void*);
 struct procinfo {
   int pid;
   int state;
+  int ticks;
+  int queue_level;
 };
 
 int getprocinfo(int pid, struct procinfo *info);
