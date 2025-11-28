@@ -26,6 +26,24 @@ extern char trampoline[]; // trampoline.S
 // must be acquired before any p->lock.
 struct spinlock wait_lock;
 
+// MLFQ Scheduler global state
+struct spinlock mlfq_lock;
+struct proc *mlfq_queues[MLFQ_LEVELS];  // Head of each priority queue
+uint64 last_boost_ticks = 0;             // Last global priority boost time
+
+// Get time quantum for a given queue level
+static uint64
+get_time_quantum(int level)
+{
+  switch(level) {
+    case 0: return TIME_QUANTA_0;
+    case 1: return TIME_QUANTA_1;
+    case 2: return TIME_QUANTA_2;
+    case 3: return TIME_QUANTA_3;
+    default: return TIME_QUANTA_3;
+  }
+}
+
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -51,10 +69,22 @@ procinit(void)
   
   initlock(&pid_lock, "nextpid");
   initlock(&wait_lock, "wait_lock");
+  initlock(&mlfq_lock, "mlfq");
+  
+  // Initialize MLFQ queues
+  for(int i = 0; i < MLFQ_LEVELS; i++) {
+    mlfq_queues[i] = 0;
+  }
+  
   for(p = proc; p < &proc[NPROC]; p++) {
       initlock(&p->lock, "proc");
       p->state = UNUSED;
       p->kstack = KSTACK((int) (p - proc));
+      // Initialize MLFQ fields
+      p->queue_level = 0;
+      p->ticks_in_queue = 0;
+      p->total_ticks = 0;
+      p->last_boost_ticks = 0;
   }
 }
 
@@ -125,6 +155,13 @@ found:
   p->pid = allocpid();
   p->state = USED;
 
+  // Initialize MLFQ fields - new processes start at highest priority
+  p->queue_level = 0;
+  p->ticks_in_queue = 0;
+  p->total_ticks = 0;
+  extern uint ticks;
+  p->last_boost_ticks = ticks;
+
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
     freeproc(p);
@@ -169,6 +206,12 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  
+  // Reset MLFQ fields
+  p->queue_level = 0;
+  p->ticks_in_queue = 0;
+  p->total_ticks = 0;
+  p->last_boost_ticks = 0;
 }
 
 // Create a user page table for a given process, with no user memory,
@@ -414,6 +457,46 @@ kwait(uint64 addr)
   }
 }
 
+// MLFQ Helper: Demote a process to lower priority queue
+// p->lock must be held
+static void
+mlfq_demote(struct proc *p)
+{
+  if(p->queue_level < MLFQ_LEVELS - 1) {
+    p->queue_level++;
+    p->ticks_in_queue = 0;
+  }
+}
+
+// MLFQ Helper: Check if process has exceeded time quantum
+// Returns 1 if exceeded, 0 otherwise
+// p->lock must be held
+static int
+mlfq_exceeded_quantum(struct proc *p)
+{
+  uint64 quantum = get_time_quantum(p->queue_level);
+  return p->ticks_in_queue >= quantum;
+}
+
+// MLFQ Helper: Boost all processes to top queue (starvation prevention)
+// mlfq_lock must be held
+static void
+mlfq_boost_all(void)
+{
+  struct proc *p;
+  extern uint ticks;
+  
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->state != UNUSED && p->state != ZOMBIE) {
+      p->queue_level = 0;
+      p->ticks_in_queue = 0;
+      p->last_boost_ticks = ticks;
+    }
+    release(&p->lock);
+  }
+}
+
 // Per-CPU process scheduler.
 // Each CPU calls scheduler() after setting itself up.
 // Scheduler never returns.  It loops, doing:
@@ -426,6 +509,7 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  extern uint ticks;
 
   c->proc = 0;
   for(;;){
@@ -437,25 +521,54 @@ scheduler(void)
     intr_on();
     intr_off();
 
-    int found = 0;
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        swtch(&c->context, &p->context);
-
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
-        found = 1;
-      }
-      release(&p->lock);
+    acquire(&mlfq_lock);
+    
+    // Check if it's time for priority boost (starvation prevention)
+    if(ticks - last_boost_ticks >= BOOST_INTERVAL) {
+      mlfq_boost_all();
+      last_boost_ticks = ticks;
     }
-    if(found == 0) {
+    
+    release(&mlfq_lock);
+
+    // Search for highest priority RUNNABLE process
+    struct proc *best = 0;
+    
+    // Search from highest to lowest priority
+    for(int level = 0; level < MLFQ_LEVELS; level++) {
+      for(p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+        
+        if(p->state == RUNNABLE && p->queue_level == level) {
+          if(best == 0) {
+            best = p;
+            // Don't release lock yet; we'll use it below
+          } else {
+            release(&p->lock);
+          }
+        } else {
+          release(&p->lock);
+        }
+        
+        // If we found someone at this level, run them
+        if(best != 0)
+          break;
+      }
+      
+      if(best != 0)
+        break;
+    }
+
+    if(best != 0) {
+      // best->lock is held from above
+      best->state = RUNNING;
+      c->proc = best;
+      swtch(&c->context, &best->context);
+
+      // Process is done running for now.
+      c->proc = 0;
+      release(&best->lock);
+    } else {
       // nothing to run; stop running on this core until an interrupt.
       asm volatile("wfi");
     }
@@ -496,6 +609,16 @@ yield(void)
   struct proc *p = myproc();
   acquire(&p->lock);
   p->state = RUNNABLE;
+  
+  // Update MLFQ state: increment ticks in current queue
+  p->ticks_in_queue++;
+  p->total_ticks++;
+  
+  // Check if process exceeded its time quantum for current queue
+  if(mlfq_exceeded_quantum(p)) {
+    mlfq_demote(p);
+  }
+  
   sched();
   release(&p->lock);
 }

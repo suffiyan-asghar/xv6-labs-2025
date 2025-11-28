@@ -13,3 +13,16 @@
 #define MAXPATH      128   // maximum file path name
 #define USERSTACK    1     // user stack pages
 
+// MLFQ Scheduler parameters
+#define MLFQ_LEVELS  4     // Number of priority queue levels
+#define BOOST_INTERVAL 256 // Priority boost interval (ticks)
+// Time quanta for each queue level (in ticks)
+// Queue 0 (highest priority): 4 ticks
+// Queue 1: 8 ticks
+// Queue 2: 16 ticks
+// Queue 3 (lowest priority): 32 ticks
+#define TIME_QUANTA_0 4
+#define TIME_QUANTA_1 8
+#define TIME_QUANTA_2 16
+#define TIME_QUANTA_3 32
+

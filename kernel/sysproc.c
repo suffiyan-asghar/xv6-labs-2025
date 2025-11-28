@@ -6,6 +6,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "vm.h"
+#include "procinfo.h"
 
 uint64
 sys_exit(void)
@@ -107,3 +108,33 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// Get process information for MLFQ debugging
+// Returns info about the calling process
+uint64
+sys_getprocinfo(void)
+{
+  uint64 addr;
+  struct proc *p = myproc();
+  
+  argaddr(0, &addr);
+  
+  // Create a structure to hold the info to copy out
+  struct {
+    int pid;
+    int state;
+    int queue_level;
+    uint64 ticks_in_queue;
+  } info;
+  
+  info.pid = p->pid;
+  info.state = p->state;
+  info.queue_level = p->queue_level;
+  info.ticks_in_queue = p->ticks_in_queue;
+  
+  if(copyout(p->pagetable, addr, (char *)&info, sizeof(info)) < 0)
+    return -1;
+  
+  return 0;
+}
+
