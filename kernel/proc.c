@@ -31,19 +31,6 @@ struct spinlock mlfq_lock;
 struct proc *mlfq_queues[MLFQ_LEVELS];  // Head of each priority queue
 uint64 last_boost_ticks = 0;             // Last global priority boost time
 
-// Get time quantum for a given queue level
-static uint64
-get_time_quantum(int level)
-{
-  switch(level) {
-    case 0: return TIME_QUANTA_0;
-    case 1: return TIME_QUANTA_1;
-    case 2: return TIME_QUANTA_2;
-    case 3: return TIME_QUANTA_3;
-    default: return TIME_QUANTA_3;
-  }
-}
-
 // Allocate a page for each process's kernel stack.
 // Map it high in memory, followed by an invalid
 // guard page.
@@ -457,27 +444,6 @@ kwait(uint64 addr)
   }
 }
 
-// MLFQ Helper: Demote a process to lower priority queue
-// p->lock must be held
-static void
-mlfq_demote(struct proc *p)
-{
-  if(p->queue_level < MLFQ_LEVELS - 1) {
-    p->queue_level++;
-    p->ticks_in_queue = 0;
-  }
-}
-
-// MLFQ Helper: Check if process has exceeded time quantum
-// Returns 1 if exceeded, 0 otherwise
-// p->lock must be held
-static int
-mlfq_exceeded_quantum(struct proc *p)
-{
-  uint64 quantum = get_time_quantum(p->queue_level);
-  return p->ticks_in_queue >= quantum;
-}
-
 // MLFQ Helper: Boost all processes to top queue (starvation prevention)
 // mlfq_lock must be held
 static void
@@ -610,14 +576,8 @@ yield(void)
   acquire(&p->lock);
   p->state = RUNNABLE;
   
-  // Update MLFQ state: increment ticks in current queue
-  p->ticks_in_queue++;
-  p->total_ticks++;
-  
-  // Check if process exceeded its time quantum for current queue
-  if(mlfq_exceeded_quantum(p)) {
-    mlfq_demote(p);
-  }
+  // MLFQ demotion is now handled in trap.c on each timer interrupt
+  // This ensures demotion happens even for processes that don't explicitly yield
   
   sched();
   release(&p->lock);

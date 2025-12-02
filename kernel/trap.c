@@ -81,8 +81,32 @@ usertrap(void)
     kexit(-1);
 
   // give up the CPU if this is a timer interrupt.
-  if(which_dev == 2)
+  if(which_dev == 2) {
+    // Update MLFQ state on each timer tick
+    acquire(&p->lock);
+    p->ticks_in_queue++;
+    p->total_ticks++;
+    
+    // Check if process exceeded its time quantum and demote if necessary
+    // Get quantum for current level (from param.h)
+    uint64 quantum;
+    switch(p->queue_level) {
+      case 0: quantum = TIME_QUANTA_0; break;
+      case 1: quantum = TIME_QUANTA_1; break;
+      case 2: quantum = TIME_QUANTA_2; break;
+      case 3: quantum = TIME_QUANTA_3; break;
+      default: quantum = TIME_QUANTA_3; break;
+    }
+    
+    // Demote if exceeded quantum and not at lowest level
+    if(p->ticks_in_queue >= quantum && p->queue_level < MLFQ_LEVELS - 1) {
+      p->queue_level++;
+      p->ticks_in_queue = 0;
+    }
+    
+    release(&p->lock);
     yield();
+  }
 
   prepare_return();
 

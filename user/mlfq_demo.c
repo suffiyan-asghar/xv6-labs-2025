@@ -18,16 +18,34 @@ int main(int argc, char *argv[]) {
   pid = fork();
   
   if(pid == 0) {
-    // Child: CPU-bound work
+    // Child: CPU-bound work - long enough to accumulate many ticks
     struct procinfo info;
     printf("Child running CPU-bound task...\n");
     
-    volatile int sum = 0;
-    for(int i = 0; i < 3000000; i++) {
-      sum += i;
+    volatile long sum = 0;
+    // Do many iterations of very heavy work to guarantee significant timer ticks
+    // Each iteration is ~50M operations, should take multiple timer intervals
+    for(int loop = 0; loop < 20; loop++) {
+      for(long i = 0; i < 100000000; i++) {
+        sum += i;
+        sum = sum % 1000000;  // Keep it bounded
+      }
+      
+      // Add a brief pause to allow observation of intermediate queue levels
+      // This doesn't significantly change behavior but allows checkpoints to catch Q0, Q1, Q2
+      if(loop % 4 == 0) {
+        pause(1);  // Very brief I/O - won't demote due to it, but allows observation window
+      }
+      
+      // Check status at each checkpoint to see progression
+      if(loop % 1 == 0) {  // Print EVERY iteration to catch all queue transitions
+        if(getprocinfo((uint64)&info) == 0) {
+          printf("  Checkpoint %d - Queue: %d, Ticks: %ld\n", loop, info.queue_level, info.ticks_in_queue);
+        }
+      }
     }
     
-    // Check own info before exit
+    // Final check
     if(getprocinfo((uint64)&info) == 0) {
       printf("  Final - Queue: %d, Ticks: %ld\n", info.queue_level, info.ticks_in_queue);
     }
@@ -41,15 +59,24 @@ int main(int argc, char *argv[]) {
   pid = fork();
   
   if(pid == 0) {
-    // Child: I/O-bound work
+    // Child: I/O-bound work - frequent yields to stay high priority
     struct procinfo info;
     printf("Child running I/O-bound task...\n");
     
-    for(int i = 0; i < 15; i++) {
-      pause(10);  // Yield frequently
+    // Do many iterations with frequent I/O (pause calls)
+    // Should stay at Queue 0 because it yields before quantum expires
+    for(int i = 0; i < 50; i++) {
+      pause(10);  // Yield for 10 ticks, then return to work
+      
+      // Check status at each checkpoint to verify staying at Q0
+      if(i % 10 == 0) {
+        if(getprocinfo((uint64)&info) == 0) {
+          printf("  Checkpoint %d - Queue: %d, Ticks: %ld\n", i, info.queue_level, info.ticks_in_queue);
+        }
+      }
     }
     
-    // Check own info before exit
+    // Final check
     if(getprocinfo((uint64)&info) == 0) {
       printf("  Final - Queue: %d, Ticks: %ld\n", info.queue_level, info.ticks_in_queue);
     }
