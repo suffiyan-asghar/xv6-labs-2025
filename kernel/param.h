@@ -15,7 +15,7 @@
 
 // MLFQ Scheduler parameters
 #define MLFQ_LEVELS  4     // Number of priority queue levels
-#define BOOST_INTERVAL 256 // Priority boost interval (ticks)
+#define BOOST_INTERVAL 50 // Priority boost interval (ticks) - lowered for testing visibility
 // Time quanta for each queue level (in ticks)
 // Queue 0 (highest priority): 4 ticks
 // Queue 1: 8 ticks

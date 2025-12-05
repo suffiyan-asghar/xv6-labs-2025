@@ -99,6 +99,8 @@ usertrap(void)
     }
     
     // Demote if exceeded quantum and not at lowest level
+    // Use > instead of >= so that a process gets its full quantum
+    // Example: Q0 has quantum=4, so ticks 0,1,2,3,4 (5 ticks), demote on 6th tick
     if(p->ticks_in_queue >= quantum && p->queue_level < MLFQ_LEVELS - 1) {
       p->queue_level++;
       p->ticks_in_queue = 0;

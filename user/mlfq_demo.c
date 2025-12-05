@@ -23,25 +23,18 @@ int main(int argc, char *argv[]) {
     printf("Child running CPU-bound task...\n");
     
     volatile long sum = 0;
-    // Do many iterations of very heavy work to guarantee significant timer ticks
-    // Each iteration is ~50M operations, should take multiple timer intervals
-    for(int loop = 0; loop < 20; loop++) {
-      for(long i = 0; i < 100000000; i++) {
+    // Do CPU work with frequent checkpoints to observe queue progression
+    // Using smaller loop sizes so we can see transitions between checkpoints
+    for(int loop = 0; loop < 200; loop++) {
+      // Smaller computation between checkpoints (~5-10 timer ticks worth)
+      for(long i = 0; i < 5000000; i++) {
         sum += i;
         sum = sum % 1000000;  // Keep it bounded
       }
       
-      // Add a brief pause to allow observation of intermediate queue levels
-      // This doesn't significantly change behavior but allows checkpoints to catch Q0, Q1, Q2
-      if(loop % 4 == 0) {
-        pause(1);  // Very brief I/O - won't demote due to it, but allows observation window
-      }
-      
       // Check status at each checkpoint to see progression
-      if(loop % 1 == 0) {  // Print EVERY iteration to catch all queue transitions
-        if(getprocinfo((uint64)&info) == 0) {
-          printf("  Checkpoint %d - Queue: %d, Ticks: %ld\n", loop, info.queue_level, info.ticks_in_queue);
-        }
+      if(getprocinfo((uint64)&info) == 0) {
+        printf("  Checkpoint %d - Queue: %d, Ticks: %ld\n", loop, info.queue_level, info.ticks_in_queue);
       }
     }
     

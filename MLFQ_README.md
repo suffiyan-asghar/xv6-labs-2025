@@ -154,8 +154,6 @@ struct procinfo {
   int queue_level;         // Current priority (0-3)
   uint64 ticks_in_queue;   // Ticks in current queue
   uint64 total_ticks;      // Total ticks consumed
-  int state;               // Process state
-  char name[16];           // Process name
 };
 ```
 

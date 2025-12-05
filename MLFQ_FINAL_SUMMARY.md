@@ -85,7 +85,7 @@ sys_getprocinfo() - Returns info about calling process
 2. **Round-Robin**: Same queue = fair time sharing
 3. **New at Top**: New processes start at queue 0
 4. **Demotion**: Exceed time quantum → move down one level
-5. **Starvation Prevention**: Every 256 ticks, boost all to queue 0
+5. **Starvation Prevention**: Every 50 ticks, boost all to queue 0
 
 ### Process Evolution
 

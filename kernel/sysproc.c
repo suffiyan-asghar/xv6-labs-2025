@@ -126,12 +126,12 @@ sys_getprocinfo(void)
     int queue_level;
     uint64 ticks_in_queue;
   } info;
-  
+  acquire(&p->lock);
   info.pid = p->pid;
   info.state = p->state;
   info.queue_level = p->queue_level;
   info.ticks_in_queue = p->ticks_in_queue;
-  
+  release(&p->lock);
   if(copyout(p->pagetable, addr, (char *)&info, sizeof(info)) < 0)
     return -1;
   
